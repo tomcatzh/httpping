@@ -38,7 +38,17 @@ httpping [选项] <URL>
 ```
 httpping example.com -c 5 -t 2
 ```
-这将对 `example.com` 进行 5 次 ping，每次 ping 之间间隔 2 秒。
+这将对 `example.com` 进行 5 次 ping，每次 ping 之间间隔 2 秒。现在的输出将包含 HTTP 状态码：
+
+```
+Ping 1: URL: https://example.com - Method: GET - Status: 200 - Time: 123 ms
+Ping 2: URL: https://example.com - Method: GET - Status: 200 - Time: 118 ms
+Ping 3: URL: https://example.com - Method: GET - Status: 200 - Time: 120 ms
+Ping 4: URL: https://example.com - Method: GET - Status: 200 - Time: 119 ms
+Ping 5: URL: https://example.com - Method: GET - Status: 200 - Time: 121 ms
+
+平均响应时间: 120 ms
+```
 
 2. 带有自定义头部和数据的 POST 请求：
 ```

@@ -44,7 +44,7 @@ fn parse_header(s: &str) -> Result<(String, String), String> {
     Ok((parts[0].trim().to_string(), parts[1].trim().to_string()))
 }
 
-async fn http_ping(input_url: &str, show_warning: bool, method: &str, headers: &[(String, String)], data: &Option<String>) -> Result<(Duration, String)> {
+async fn http_ping(input_url: &str, show_warning: bool, method: &str, headers: &[(String, String)], data: &Option<String>) -> Result<(Duration, String, u16)> {
     let start = Instant::now();
 
     // Handle URL without scheme
@@ -88,6 +88,8 @@ async fn http_ping(input_url: &str, show_warning: bool, method: &str, headers: &
         request.push_str(data);
     }
 
+    let mut buffer = Vec::new();
+
     if url.scheme() == "https" {
         let mut root_store = rustls::RootCertStore::empty();
         root_store.add_trust_anchors(
@@ -110,19 +112,21 @@ async fn http_ping(input_url: &str, show_warning: bool, method: &str, headers: &
             .map_err(|_| anyhow!("Invalid DNS name"))?;
         let mut tls_stream = connector.connect(domain, tcp_stream).await?;
         tls_stream.write_all(request.as_bytes()).await?;
-
-        let mut buffer = [0; 1024];
-        tls_stream.read(&mut buffer).await?;
+        tls_stream.read_to_end(&mut buffer).await?;
     } else {
         let mut tcp_stream = tcp_stream;
         tcp_stream.write_all(request.as_bytes()).await?;
-
-        let mut buffer = [0; 1024];
-        tcp_stream.read(&mut buffer).await?;
+        tcp_stream.read_to_end(&mut buffer).await?;
     }
 
+    let response = String::from_utf8_lossy(&buffer);
+    let status_code = response.lines().next()
+        .and_then(|status_line| status_line.split_whitespace().nth(1))
+        .and_then(|code| code.parse().ok())
+        .unwrap_or(0);
+
     let duration = start.elapsed();
-    Ok((duration, url.to_string()))
+    Ok((duration, url.to_string(), status_code))
 }
 
 #[tokio::main]
@@ -134,14 +138,15 @@ async fn main() -> Result<()> {
 
     for i in 1..=args.count {
         match http_ping(&args.url, show_warning, &args.method, &args.headers, &args.data).await {
-            Ok((duration, full_url)) => {
+            Ok((duration, full_url, status_code)) => {
                 total_duration += duration;
                 successful_pings += 1;
                 println!(
-                    "Ping {}: URL: {} - Method: {} - Time: {} ms",
+                    "Ping {}: URL: {} - Method: {} - Status: {} - Time: {} ms",
                     i,
                     full_url,
                     args.method,
+                    status_code,
                     duration.as_millis()
                 );
                 show_warning = false; // Disable warning after first successful ping

@@ -38,7 +38,17 @@ Options:
 ```
 httpping example.com -c 5 -t 2
 ```
-This will ping `example.com` 5 times with a 2-second interval between each ping.
+This will ping `example.com` 5 times with a 2-second interval between each ping. The output will now include the HTTP status code:
+
+```
+Ping 1: URL: https://example.com - Method: GET - Status: 200 - Time: 123 ms
+Ping 2: URL: https://example.com - Method: GET - Status: 200 - Time: 118 ms
+Ping 3: URL: https://example.com - Method: GET - Status: 200 - Time: 120 ms
+Ping 4: URL: https://example.com - Method: GET - Status: 200 - Time: 119 ms
+Ping 5: URL: https://example.com - Method: GET - Status: 200 - Time: 121 ms
+
+Average response time: 120 ms
+```
 
 2. POST request with custom headers and data:
 ```
