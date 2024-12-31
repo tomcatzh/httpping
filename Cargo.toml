@@ -1,0 +1,12 @@
+[package]
+name = "httpping"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+native-tls = "0.2"
+tokio-native-tls = "0.3"
+clap = { version = "4.3", features = ["derive"] }
+anyhow = "1.0"
+url = "2.3"
