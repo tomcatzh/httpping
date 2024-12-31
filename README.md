@@ -1,6 +1,8 @@
 # httpping
 
-httpping is a command-line tool for HTTP/HTTPS ping, written in Rust. It allows you to measure the response time of web servers.
+English | [中文](README.zh.md)
+
+httpping is a command-line tool for HTTP/HTTPS ping, written in Rust. It allows you to measure the response time of web servers and supports various HTTP methods and custom headers.
 
 ## Features
 
@@ -8,6 +10,9 @@ httpping is a command-line tool for HTTP/HTTPS ping, written in Rust. It allows 
 - Customizable number of pings
 - Adjustable interval between pings
 - Automatic HTTPS scheme addition if not specified
+- Support for different HTTP methods (GET, POST, etc.)
+- Custom headers
+- Request data support
 
 ## Usage
 
@@ -20,17 +25,26 @@ Arguments:
 Options:
   -c, --count <COUNT>        Number of times to ping [default: 4]
   -t, --interval <INTERVAL>  Interval between pings in seconds [default: 1.0]
+  -X, --request <METHOD>     HTTP method to use [default: GET]
+  -H, --header <HEADER>      Custom header(s) to include (can be used multiple times)
+  -d, --data <DATA>          Data to include in the request body
   -h, --help                 Print help
   -V, --version              Print version
 ```
 
-## Example
+## Examples
 
+1. Simple GET request:
 ```
 httpping example.com -c 5 -t 2
 ```
-
 This will ping `example.com` 5 times with a 2-second interval between each ping.
+
+2. POST request with custom headers and data:
+```
+httpping http://localhost:8866/admin/api-key/apply -X POST -H "Content-Type: application/json" -H "Authorization: Bearer br_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" -d '{"name": "adminuser","group_id": 1,"role": "admin","email": "", "month_quota":"20"}'
+```
+This will send a POST request to the specified URL with custom headers and JSON data in the request body.
 
 ## Installation
 

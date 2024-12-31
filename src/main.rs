@@ -22,9 +22,29 @@ struct Args {
     /// Interval between pings in seconds
     #[arg(short = 't', long, default_value_t = 1.0)]
     interval: f32,
+
+    /// HTTP method
+    #[arg(short = 'X', long = "request", default_value = "GET")]
+    method: String,
+
+    /// HTTP headers
+    #[arg(short = 'H', long = "header", value_parser = parse_header)]
+    headers: Vec<(String, String)>,
+
+    /// HTTP request data
+    #[arg(short = 'd', long = "data")]
+    data: Option<String>,
 }
 
-async fn http_ping(input_url: &str, show_warning: bool) -> Result<(Duration, String)> {
+fn parse_header(s: &str) -> Result<(String, String), String> {
+    let parts: Vec<&str> = s.splitn(2, ':').collect();
+    if parts.len() != 2 {
+        return Err(format!("Invalid header format: {}", s));
+    }
+    Ok((parts[0].trim().to_string(), parts[1].trim().to_string()))
+}
+
+async fn http_ping(input_url: &str, show_warning: bool, method: &str, headers: &[(String, String)], data: &Option<String>) -> Result<(Duration, String)> {
     let start = Instant::now();
 
     // Handle URL without scheme
@@ -44,11 +64,29 @@ async fn http_ping(input_url: &str, show_warning: bool) -> Result<(Duration, Str
     let addr = format!("{}:{}", host, port);
     let tcp_stream = TcpStream::connect(addr).await?;
 
-    let request = format!(
-        "GET {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n",
+    let mut request = format!(
+        "{} {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n",
+        method,
         url.path(),
         host
     );
+
+    // Add custom headers
+    for (key, value) in headers {
+        request.push_str(&format!("{}: {}\r\n", key, value));
+    }
+
+    // Add Content-Length header if there's data
+    if let Some(data) = data {
+        request.push_str(&format!("Content-Length: {}\r\n", data.len()));
+    }
+
+    request.push_str("\r\n");
+
+    // Add data if present
+    if let Some(data) = data {
+        request.push_str(data);
+    }
 
     if url.scheme() == "https" {
         let mut root_store = rustls::RootCertStore::empty();
@@ -95,14 +133,15 @@ async fn main() -> Result<()> {
     let mut show_warning = true;
 
     for i in 1..=args.count {
-        match http_ping(&args.url, show_warning).await {
+        match http_ping(&args.url, show_warning, &args.method, &args.headers, &args.data).await {
             Ok((duration, full_url)) => {
                 total_duration += duration;
                 successful_pings += 1;
                 println!(
-                    "Ping {}: URL: {} - Time: {} ms",
+                    "Ping {}: URL: {} - Method: {} - Time: {} ms",
                     i,
                     full_url,
+                    args.method,
                     duration.as_millis()
                 );
                 show_warning = false; // Disable warning after first successful ping
