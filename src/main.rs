@@ -88,7 +88,10 @@ async fn http_ping(input_url: &str, show_warning: bool, method: &str, headers: &
         request.push_str(data);
     }
 
-    let mut buffer = Vec::new();
+    let mut buffer = [0; 4096];
+    let mut response = String::new();
+    let mut duration = Duration::new(0, 0);
+    let mut first_byte_received = false;
 
     if url.scheme() == "https" {
         let mut root_store = rustls::RootCertStore::empty();
@@ -112,20 +115,46 @@ async fn http_ping(input_url: &str, show_warning: bool, method: &str, headers: &
             .map_err(|_| anyhow!("Invalid DNS name"))?;
         let mut tls_stream = connector.connect(domain, tcp_stream).await?;
         tls_stream.write_all(request.as_bytes()).await?;
-        tls_stream.read_to_end(&mut buffer).await?;
+        
+        loop {
+            let bytes_read = tls_stream.read(&mut buffer).await?;
+            if bytes_read == 0 {
+                break;
+            }
+            if !first_byte_received {
+                duration = start.elapsed();
+                first_byte_received = true;
+            }
+            response.push_str(&String::from_utf8_lossy(&buffer[..bytes_read]));
+            if response.contains("\r\n\r\n") {
+                break;
+            }
+        }
     } else {
         let mut tcp_stream = tcp_stream;
         tcp_stream.write_all(request.as_bytes()).await?;
-        tcp_stream.read_to_end(&mut buffer).await?;
+        
+        loop {
+            let bytes_read = tcp_stream.read(&mut buffer).await?;
+            if bytes_read == 0 {
+                break;
+            }
+            if !first_byte_received {
+                duration = start.elapsed();
+                first_byte_received = true;
+            }
+            response.push_str(&String::from_utf8_lossy(&buffer[..bytes_read]));
+            if response.contains("\r\n\r\n") {
+                break;
+            }
+        }
     }
 
-    let response = String::from_utf8_lossy(&buffer);
     let status_code = response.lines().next()
         .and_then(|status_line| status_line.split_whitespace().nth(1))
         .and_then(|code| code.parse().ok())
         .unwrap_or(0);
 
-    let duration = start.elapsed();
     Ok((duration, url.to_string(), status_code))
 }
 
