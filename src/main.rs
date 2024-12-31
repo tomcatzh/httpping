@@ -178,13 +178,13 @@ async fn main() -> Result<()> {
                     status_code,
                     duration.as_millis()
                 );
-                show_warning = false; // Disable warning after first successful ping
             }
             Err(e) => {
                 println!("Ping {} failed: {}", i, e);
             }
         }
 
+        show_warning = false; // Disable warning after first ping attempt
         if i < args.count {
             tokio::time::sleep(tokio::time::Duration::from_secs_f32(args.interval)).await;
         }
