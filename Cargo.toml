@@ -5,8 +5,9 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
-native-tls = "0.2"
-tokio-native-tls = "0.3"
+rustls = "0.21"
+tokio-rustls = "0.24"
+webpki-roots = "0.25"
 clap = { version = "4.3", features = ["derive"] }
 anyhow = "1.0"
 url = "2.3"

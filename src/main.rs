@@ -1,10 +1,13 @@
 use anyhow::{Result, anyhow};
 use clap::Parser;
-use native_tls::TlsConnector;
 use std::time::{Duration, Instant};
+use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
+use tokio_rustls::TlsConnector;
+use rustls::OwnedTrustAnchor;
 use url::Url;
+use webpki_roots;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -39,7 +42,7 @@ async fn http_ping(input_url: &str, show_warning: bool) -> Result<(Duration, Str
     let port = url.port_or_known_default().ok_or_else(|| anyhow!("Invalid port"))?;
 
     let addr = format!("{}:{}", host, port);
-    let mut tcp_stream = TcpStream::connect(addr).await?;
+    let tcp_stream = TcpStream::connect(addr).await?;
 
     let request = format!(
         "GET {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n",
@@ -48,14 +51,32 @@ async fn http_ping(input_url: &str, show_warning: bool) -> Result<(Duration, Str
     );
 
     if url.scheme() == "https" {
-        let tls_connector = TlsConnector::new()?;
-        let tls_connector = tokio_native_tls::TlsConnector::from(tls_connector);
-        let mut tls_stream = tls_connector.connect(host, tcp_stream).await?;
+        let mut root_store = rustls::RootCertStore::empty();
+        root_store.add_trust_anchors(
+            webpki_roots::TLS_SERVER_ROOTS
+                .iter()
+                .map(|ta| {
+                    OwnedTrustAnchor::from_subject_spki_name_constraints(
+                        ta.subject,
+                        ta.spki,
+                        ta.name_constraints,
+                    )
+                })
+        );
+        let config = rustls::ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(root_store)
+            .with_no_client_auth();
+        let connector = TlsConnector::from(Arc::new(config));
+        let domain = rustls::ServerName::try_from(host)
+            .map_err(|_| anyhow!("Invalid DNS name"))?;
+        let mut tls_stream = connector.connect(domain, tcp_stream).await?;
         tls_stream.write_all(request.as_bytes()).await?;
 
         let mut buffer = [0; 1024];
         tls_stream.read(&mut buffer).await?;
     } else {
+        let mut tcp_stream = tcp_stream;
         tcp_stream.write_all(request.as_bytes()).await?;
 
         let mut buffer = [0; 1024];
